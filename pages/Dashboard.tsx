@@ -16,10 +16,9 @@ export const Dashboard = () => {
   } = useInfiniteQuery({
     queryKey: ['feed'],
     queryFn: api.posts.getFeed,
-    initialPageParam: 1,
+    initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
-      // For mock purposes, just increment page number endlessly
-      return allPages.length + 1;
+      return lastPage.length > 0 ? allPages.length : undefined;
     },
   });
 

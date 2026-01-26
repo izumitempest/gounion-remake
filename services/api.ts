@@ -1,77 +1,134 @@
 import axios from 'axios';
-import { MOCK_USER, MOCK_POSTS, MOCK_GROUPS, MOCK_CHATS, MOCK_NOTIFICATIONS } from './mockData';
 
-// In a real app, this would be the actual backend URL
 const API_URL = 'http://127.0.0.1:8001';
 
-// Mock delay helper
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// Create axios instance
+const apiClient = axios.create({
+  baseURL: API_URL,
+});
 
-// Service object
+// Add interceptor to include token
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Helper to transform user data
+const transformUser = (user: any) => ({
+  id: user.id,
+  username: user.username,
+  fullName: user.username, // Using username as fullName if not provided
+  avatarUrl: user.profile?.profile_picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`,
+  university: user.profile?.university || 'University Student',
+  followers: 0, // Need endpoints for these or compute from data
+  following: 0,
+  bio: user.profile?.bio || '',
+  coverUrl: user.profile?.cover_photo || '',
+});
+
+// Helper to transform post data
+const transformPost = (post: any) => ({
+  id: post.id.toString(),
+  author: transformUser(post.user),
+  content: post.caption || '',
+  imageUrl: post.image,
+  likes: post.likes_count || 0,
+  comments: post.comments?.length || 0,
+  timestamp: new Date(post.created_at).toLocaleDateString(),
+  isLiked: false, // This needs checking against current user in real app
+});
+
 export const api = {
   auth: {
     login: async (credentials: any) => {
-      await delay(1000); // Simulate network
-      // Return mock user and token
-      return { user: MOCK_USER, access_token: 'mock_jwt_token_xyz' };
+      const formData = new FormData();
+      formData.append('username', credentials.email); // OAuth2 expects username
+      formData.append('password', credentials.password);
+      
+      const res = await apiClient.post('/token', formData);
+      localStorage.setItem('access_token', res.data.access_token);
+      
+      const userRes = await apiClient.get('/users/me/');
+      const transformedUser = transformUser(userRes.data);
+      return { user: transformedUser, access_token: res.data.access_token };
     },
     signup: async (data: any) => {
-      await delay(1500);
-      return { user: MOCK_USER, access_token: 'mock_jwt_token_xyz' };
+      const res = await apiClient.post('/users/', {
+        username: data.username,
+        email: data.email,
+        password: data.password
+      });
+      
+      // Auto-login after signup
+      return api.auth.login({ email: data.email, password: data.password });
     },
     me: async () => {
-      await delay(500);
-      return MOCK_USER;
+      const res = await apiClient.get('/users/me/');
+      return transformUser(res.data);
     }
   },
   posts: {
-    getFeed: async ({ pageParam = 1 }: { pageParam?: number } = {}) => {
-      await delay(800);
-      // Simulate pagination: return duplicated mock data with unique IDs based on pageParam
-      // In a real app, this would fetch specific pages from the backend
-      return MOCK_POSTS.map(post => ({
-        ...post,
-        id: `${post.id}_page${pageParam}`
-      }));
+    getFeed: async ({ pageParam = 0 }: { pageParam?: number } = {}) => {
+      const res = await apiClient.get(`/posts/?skip=${pageParam * 10}&limit=10`);
+      return res.data.map(transformPost);
     },
     create: async (data: any) => {
-      await delay(1000);
-      return {
-        id: Math.random().toString(),
-        author: MOCK_USER,
-        content: data.caption,
-        imageUrl: data.image ? URL.createObjectURL(data.image) : undefined,
-        likes: 0,
-        comments: 0,
-        timestamp: 'Just now',
-        isLiked: false
-      };
+      let imageUrl = null;
+      if (data.image) {
+        const formData = new FormData();
+        formData.append('file', data.image);
+        const uploadRes = await apiClient.post('/upload/', formData);
+        imageUrl = uploadRes.data.url;
+      }
+      
+      const res = await apiClient.post('/posts/', {
+        caption: data.caption,
+        image: imageUrl
+      });
+      return transformPost(res.data);
     },
     like: async (id: string) => {
-      await delay(200);
-      return { success: true };
+      const res = await apiClient.post(`/posts/${id}/like`);
+      return { success: true, likes_count: res.data.likes_count };
     }
   },
   groups: {
     getAll: async () => {
-      await delay(600);
-      return MOCK_GROUPS;
+      const res = await apiClient.get('/groups/');
+      return res.data.map((g: any) => ({
+        id: g.id.toString(),
+        name: g.name,
+        description: g.description,
+        memberCount: 0, // Need to implement member count in backend properly
+        imageUrl: g.cover_image || `https://api.dicebear.com/7.x/identicon/svg?seed=${g.name}`,
+        isJoined: false
+      }));
     },
     join: async (id: string) => {
-      await delay(400);
+      const res = await apiClient.post(`/groups/${id}/join`);
       return { success: true };
     }
   },
   chats: {
     getAll: async () => {
-      await delay(500);
-      return MOCK_CHATS;
+      // Mocked for now as Phase 4 of backend is messaging
+      return [];
     }
   },
   notifications: {
     getAll: async () => {
-      await delay(500);
-      return MOCK_NOTIFICATIONS;
+      const res = await apiClient.get('/notifications/');
+      return res.data.map((n: any) => ({
+        id: n.id.toString(),
+        type: n.type,
+        actor: transformUser(n.sender),
+        message: `${n.sender.username} ${n.type}ed your post`,
+        timestamp: new Date(n.created_at).toLocaleDateString(),
+        read: n.is_read
+      }));
     }
   }
 };

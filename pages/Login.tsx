@@ -7,11 +7,18 @@ export const Login = () => {
   const [loading, setLoading] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
 
+  const [email, setEmail] = useState('demo@gounion.com');
+  const [password, setPassword] = useState('password');
+  const [username, setUsername] = useState('demo_user');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await (isSignup ? api.auth.signup({}) : api.auth.login({}));
+      const response = await (isSignup 
+        ? api.auth.signup({ username, email, password }) 
+        : api.auth.login({ email, password })
+      );
       login(response.user, response.access_token);
     } catch (error) {
       console.error(error);
@@ -36,17 +43,35 @@ export const Login = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {isSignup && (
              <div className="space-y-1">
-              <label className="text-xs font-medium text-zinc-400 ml-1">Full Name</label>
-              <input type="text" className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-violet-500 focus:outline-none transition-colors" placeholder="John Doe" />
+              <label className="text-xs font-medium text-zinc-400 ml-1">Username</label>
+              <input 
+                type="text" 
+                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-violet-500 focus:outline-none transition-colors" 
+                placeholder="johndoe" 
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
             </div>
           )}
           <div className="space-y-1">
             <label className="text-xs font-medium text-zinc-400 ml-1">Email Address</label>
-            <input type="email" className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-violet-500 focus:outline-none transition-colors" placeholder="student@university.edu" value="demo@gounion.com" readOnly />
+            <input 
+              type="email" 
+              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-violet-500 focus:outline-none transition-colors" 
+              placeholder="student@university.edu" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-zinc-400 ml-1">Password</label>
-            <input type="password" className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-violet-500 focus:outline-none transition-colors" placeholder="••••••••" value="password" readOnly />
+            <input 
+              type="password" 
+              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-violet-500 focus:outline-none transition-colors" 
+              placeholder="••••••••" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </div>
 
           <button 

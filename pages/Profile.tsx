@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuthStore } from '../../store';
+import { useAuthStore } from '../store';
 import { GlassCard } from '../components/ui/GlassCard';
 import { MapPin, Calendar, Link as LinkIcon } from 'lucide-react';
 
