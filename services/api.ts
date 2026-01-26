@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { MOCK_USER, MOCK_POSTS, MOCK_GROUPS, MOCK_CHATS } from './mockData';
+import { MOCK_USER, MOCK_POSTS, MOCK_GROUPS, MOCK_CHATS, MOCK_NOTIFICATIONS } from './mockData';
 
 // In a real app, this would be the actual backend URL
 const API_URL = 'http://127.0.0.1:8001';
@@ -25,9 +25,14 @@ export const api = {
     }
   },
   posts: {
-    getFeed: async () => {
+    getFeed: async ({ pageParam = 1 }: { pageParam?: number } = {}) => {
       await delay(800);
-      return MOCK_POSTS;
+      // Simulate pagination: return duplicated mock data with unique IDs based on pageParam
+      // In a real app, this would fetch specific pages from the backend
+      return MOCK_POSTS.map(post => ({
+        ...post,
+        id: `${post.id}_page${pageParam}`
+      }));
     },
     create: async (data: any) => {
       await delay(1000);
@@ -61,6 +66,12 @@ export const api = {
     getAll: async () => {
       await delay(500);
       return MOCK_CHATS;
+    }
+  },
+  notifications: {
+    getAll: async () => {
+      await delay(500);
+      return MOCK_NOTIFICATIONS;
     }
   }
 };

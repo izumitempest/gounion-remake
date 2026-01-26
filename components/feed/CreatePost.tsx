@@ -13,7 +13,21 @@ export const CreatePost = () => {
   const mutation = useMutation({
     mutationFn: api.posts.create,
     onSuccess: (newPost) => {
-      queryClient.setQueryData(['feed'], (old: any) => [newPost, ...(old || [])]);
+      // Update Infinite Query cache
+      queryClient.setQueryData(['feed'], (old: any) => {
+        if (!old || !old.pages) {
+          return { pages: [[newPost]], pageParams: [1] };
+        }
+        
+        // Add the new post to the beginning of the first page
+        const newPages = [...old.pages];
+        newPages[0] = [newPost, ...newPages[0]];
+        
+        return {
+          ...old,
+          pages: newPages,
+        };
+      });
       setContent('');
     }
   });

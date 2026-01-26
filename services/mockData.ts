@@ -54,3 +54,10 @@ export const MOCK_CHATS: Chat[] = [
   { id: '1', partner: { ...MOCK_USER, id: '2', fullName: 'Sarah Chen' }, lastMessage: 'See you at the hackathon!', unreadCount: 2, timestamp: '10m' },
   { id: '2', partner: { ...MOCK_USER, id: '3', fullName: 'James Wilson' }, lastMessage: 'Thanks for the notes.', unreadCount: 0, timestamp: '1h' },
 ];
+
+export const MOCK_NOTIFICATIONS: Notification[] = [
+  { id: '1', type: 'like', actor: { ...MOCK_USER, id: '2', fullName: 'Sarah Chen' }, message: 'liked your post', timestamp: '2m', read: false },
+  { id: '2', type: 'comment', actor: { ...MOCK_USER, id: '3', fullName: 'James Wilson' }, message: 'commented on your post', timestamp: '1h', read: false },
+  { id: '3', type: 'follow', actor: { ...MOCK_USER, id: '4', fullName: 'Emily Davis' }, message: 'started following you', timestamp: '3h', read: true },
+  { id: '4', type: 'like', actor: { ...MOCK_USER, id: '5', fullName: 'Michael Brown' }, message: 'liked your post', timestamp: '5h', read: false },
+];

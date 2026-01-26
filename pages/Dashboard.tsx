@@ -1,15 +1,54 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useEffect, useRef } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { CreatePost } from '../components/feed/CreatePost';
 import { PostCard } from '../components/feed/PostCard';
+import { Skeleton } from '../components/ui/Skeleton';
 import { api } from '../services/api';
 import { Post } from '../types';
 
 export const Dashboard = () => {
-  const { data: posts, isLoading } = useQuery({
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    status,
+  } = useInfiniteQuery({
     queryKey: ['feed'],
-    queryFn: api.posts.getFeed
+    queryFn: api.posts.getFeed,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => {
+      // For mock purposes, just increment page number endlessly
+      return allPages.length + 1;
+    },
   });
+
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (loadMoreRef.current) {
+        observer.unobserve(loadMoreRef.current);
+      }
+      observer.disconnect();
+    };
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Flatten the pages array into a single list of posts
+  const posts = data?.pages.flat() || [];
 
   return (
     <div className="max-w-2xl mx-auto w-full pb-20 md:pb-0">
@@ -24,17 +63,36 @@ export const Dashboard = () => {
 
       <CreatePost />
 
-      {isLoading ? (
+      {status === 'pending' ? (
         <div className="space-y-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-48 bg-white/5 rounded-2xl animate-pulse" />
-          ))}
+          <Skeleton className="h-48 w-full rounded-2xl" />
+          <Skeleton className="h-48 w-full rounded-2xl" />
+          <Skeleton className="h-48 w-full rounded-2xl" />
+        </div>
+      ) : status === 'error' ? (
+        <div className="text-center text-red-400 py-10 bg-white/5 rounded-2xl">
+          <p>Unable to load posts. Please try again later.</p>
         </div>
       ) : (
         <div className="space-y-0">
-          {posts?.map((post: Post) => (
+          {posts.map((post: Post) => (
             <PostCard key={post.id} post={post} />
           ))}
+
+          {/* Infinite Scroll Sentinel */}
+          <div ref={loadMoreRef} className="h-24 flex flex-col items-center justify-center p-4">
+            {isFetchingNextPage ? (
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce"></div>
+              </div>
+            ) : hasNextPage ? (
+               <div className="h-4 w-full" /> 
+            ) : (
+               <p className="text-zinc-500 text-sm">You've reached the end!</p>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -2,10 +2,20 @@ import React from 'react';
 import { Search, Bell, Menu } from 'lucide-react';
 import { useAuthStore, useUIStore } from '../../store';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../../services/api';
 
 export const TopNav = () => {
   const { user } = useAuthStore();
   const { toggleSidebar } = useUIStore();
+
+  const { data: notifications } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: api.notifications.getAll,
+    refetchInterval: 30000 // Poll every 30 seconds for real-time feel
+  });
+
+  const unreadCount = notifications?.filter(n => !n.read).length || 0;
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 bg-[#09090b]/80 backdrop-blur-xl border-b border-white/5 z-50 flex items-center justify-between px-4 md:px-6">
@@ -37,7 +47,11 @@ export const TopNav = () => {
       <div className="flex items-center gap-4">
         <button className="relative p-2 text-zinc-400 hover:text-white transition-colors">
           <Bell size={20} />
-          <span className="absolute top-1.5 right-2 w-2 h-2 bg-violet-500 rounded-full animate-pulse"></span>
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 h-4 min-w-[16px] px-0.5 flex items-center justify-center bg-violet-600 text-white text-[10px] font-bold rounded-full border-2 border-[#09090b]">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </button>
         
         <Link to={`/profile/${user?.username}`}>

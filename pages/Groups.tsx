@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Search, Users as UsersIcon } from 'lucide-react';
 import { api } from '../services/api';
 import { GlassCard } from '../components/ui/GlassCard';
+import { Skeleton } from '../components/ui/Skeleton';
 import { Group } from '../types';
 
 export const Groups = () => {
@@ -29,7 +30,7 @@ export const Groups = () => {
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1,2,3,4,5,6].map(i => <div key={i} className="h-64 bg-white/5 rounded-2xl animate-pulse" />)}
+          {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-64 rounded-2xl" />)}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
