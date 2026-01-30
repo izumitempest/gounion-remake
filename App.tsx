@@ -10,6 +10,8 @@ import { Login } from './pages/Login';
 import { Groups } from './pages/Groups';
 import { Messages } from './pages/Messages';
 import { Profile } from './pages/Profile';
+import { Alumni } from './pages/Alumni';
+import { GroupDetails } from './pages/GroupDetails';
 import { useAuthStore } from './store';
 
 const queryClient = new QueryClient();
@@ -19,12 +21,14 @@ const AppLayout = ({ children }: { children?: React.ReactNode }) => {
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans selection:bg-violet-500/30">
       <TopNav />
-      <div className="flex pt-16 max-w-[1600px] mx-auto">
-        <Sidebar />
-        <main className="flex-1 p-4 md:p-6 lg:px-8 overflow-x-hidden min-h-[calc(100vh-4rem)]">
-          {children}
+      <div className="flex max-w-[1600px] mx-auto h-screen">
+        <Sidebar className="hidden md:flex w-64 lg:w-72 sticky top-0 h-full pt-16" />
+        <main className="flex-1 min-w-0 p-4 md:p-6 lg:px-8 pt-16 overflow-y-auto custom-scrollbar">
+          <div className="max-w-4xl mx-auto pb-20">
+            {children}
+          </div>
         </main>
-        <RightSidebar />
+        <RightSidebar className="hidden xl:flex w-80 sticky top-0 h-full pt-16" />
       </div>
       <MobileNav />
     </div>
@@ -50,7 +54,9 @@ const AppRoutes = () => {
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <Login />} />
       <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/groups" element={<PrivateRoute><Groups /></PrivateRoute>} />
+      <Route path="/groups/:id" element={<PrivateRoute><GroupDetails /></PrivateRoute>} />
       <Route path="/messages" element={<PrivateRoute><Messages /></PrivateRoute>} />
+      <Route path="/alumni" element={<PrivateRoute><Alumni /></PrivateRoute>} />
       <Route path="/profile/:username" element={<PrivateRoute><Profile /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

@@ -1,9 +1,9 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
 
-export const RightSidebar = () => {
+export const RightSidebar = ({ className }: { className?: string }) => {
   return (
-    <div className="hidden lg:flex flex-col w-80 h-screen sticky top-0 border-l border-white/5 bg-[#09090b]/50 backdrop-blur-md pt-24 pb-8 px-6 overflow-y-auto">
+    <div className={`${className} flex flex-col h-screen sticky top-0 border-l border-white/5 bg-[#09090b]/50 backdrop-blur-md pt-24 pb-8 px-6 overflow-y-auto`}>
       <div className="mb-8">
         <h3 className="text-zinc-100 font-semibold mb-4 text-sm uppercase tracking-wider">Suggested Groups</h3>
         <div className="space-y-4">

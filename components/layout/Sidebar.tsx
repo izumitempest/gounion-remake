@@ -10,11 +10,11 @@ const NAV_ITEMS = [
   { icon: GraduationCap, label: 'Alumni', path: '/alumni' },
 ];
 
-export const Sidebar = () => {
+export const Sidebar = ({ className }: { className?: string }) => {
   const { user, logout } = useAuthStore();
 
   return (
-    <div className="hidden md:flex flex-col w-64 h-screen sticky top-0 border-r border-white/5 bg-[#09090b]/50 backdrop-blur-md pt-24 pb-8 px-4">
+    <div className={`${className} flex flex-col h-screen sticky top-0 border-r border-white/5 bg-[#09090b]/50 backdrop-blur-md pt-24 pb-8 px-4`}>
       <nav className="flex-1 space-y-2">
         {NAV_ITEMS.map((item) => (
           <NavLink

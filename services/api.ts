@@ -39,6 +39,7 @@ const transformUser = (user: any) => {
 
 // Helper to transform post data
 const transformPost = (post: any) => {
+  const currentUserId = localStorage.getItem('user_id');
   const getFullUrl = (url: string | null) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
@@ -53,7 +54,7 @@ const transformPost = (post: any) => {
     likes: post.likes_count || 0,
     comments: post.comments?.length || 0,
     timestamp: new Date(post.created_at).toLocaleDateString(),
-    isLiked: false,
+    isLiked: post.likes?.some((l: any) => l.user_id === currentUserId) || false,
   };
 };
 
@@ -68,6 +69,7 @@ export const api = {
       localStorage.setItem('access_token', res.data.access_token);
       
       const userRes = await apiClient.get('/users/me/');
+      localStorage.setItem('user_id', userRes.data.id);
       const transformedUser = transformUser(userRes.data);
       return { user: transformedUser, access_token: res.data.access_token };
     },
@@ -174,17 +176,70 @@ export const api = {
     join: async (id: string) => {
       const res = await apiClient.post(`/groups/${id}/join`);
       return { success: true };
+    },
+    getPosts: async (id: string) => {
+      const res = await apiClient.get(`/groups/${id}/posts/`);
+      return res.data;
+    },
+    createPost: async (id: string, data: any) => {
+      let imageUrl = null;
+      if (data.image) {
+        const formData = new FormData();
+        formData.append('file', data.image);
+        const uploadRes = await apiClient.post('/upload/', formData);
+        imageUrl = uploadRes.data.url;
+      }
+      const res = await apiClient.post(`/groups/${id}/posts/`, {
+        caption: data.caption,
+        image: imageUrl
+      });
+      return res.data;
+    }
+  },
+  search: {
+    users: async (query: string) => {
+      const res = await apiClient.get(`/search/users?q=${encodeURIComponent(query)}`);
+      return res.data.map(transformUser);
     }
   },
   friends: {
     getAll: async () => {
       const res = await apiClient.get('/friends/');
       return res.data.map(transformUser);
+    },
+    sendRequest: async (userId: string) => {
+      const res = await apiClient.post(`/friend-request/${userId}`);
+      return res.data;
     }
   },
   chats: {
     getAll: async () => {
-      return [];
+      const res = await apiClient.get('/conversations/');
+      return res.data.map((c: any) => ({
+        id: c.id.toString(),
+        partner: transformUser(c.participants.find((p: any) => p.id !== localStorage.getItem('user_id')) || c.participants[0]),
+        lastMessage: c.messages?.[c.messages.length - 1]?.content || 'No messages yet',
+        timestamp: c.messages?.[c.messages.length - 1] ? new Date(c.messages[c.messages.length - 1].created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+        unreadCount: 0,
+      }));
+    },
+    getMessages: async (conversationId: string) => {
+      const res = await apiClient.get(`/conversations/${conversationId}/messages/`);
+      return res.data.map((m: any) => ({
+        id: m.id.toString(),
+        content: m.content,
+        senderId: m.sender_id,
+        timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isRead: m.is_read
+      }));
+    },
+    sendMessage: async (conversationId: string, content: string) => {
+      const res = await apiClient.post(`/conversations/${conversationId}/messages/`, { content });
+      return res.data;
+    },
+    createConversation: async (participantIds: string[], name?: string) => {
+      const res = await apiClient.post('/conversations/', { participant_ids: participantIds, name });
+      return res.data;
     }
   },
   notifications: {

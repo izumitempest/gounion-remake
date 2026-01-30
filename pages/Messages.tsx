@@ -1,14 +1,45 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Send, Phone, Video, MoreVertical, Search } from 'lucide-react';
 import { api } from '../services/api';
-import { Chat } from '../types';
 
 export const Messages = () => {
+  const queryClient = useQueryClient();
   const { data: chats } = useQuery({ queryKey: ['chats'], queryFn: api.chats.getAll });
-  const [selectedChatId, setSelectedChatId] = useState<string | null>('1');
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [messageText, setMessageText] = useState('');
+
+  const { data: messages } = useQuery({
+    queryKey: ['messages', selectedChatId],
+    queryFn: () => api.chats.getMessages(selectedChatId!),
+    enabled: !!selectedChatId,
+    refetchInterval: 5000, // Poll every 5s for demo purposes
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: ({ chatId, content }: { chatId: string; content: string }) => 
+      api.chats.sendMessage(chatId, content),
+    onSuccess: () => {
+      setMessageText('');
+      queryClient.invalidateQueries({ queryKey: ['messages', selectedChatId] });
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
+    }
+  });
 
   const selectedChat = chats?.find(c => c.id === selectedChatId);
+  const currentUserId = localStorage.getItem('user_id');
+
+  const handleSend = () => {
+    if (!messageText.trim() || !selectedChatId) return;
+    sendMessageMutation.mutate({ chatId: selectedChatId, content: messageText });
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   return (
     <div className="h-[calc(100vh-6rem)] flex rounded-2xl overflow-hidden border border-white/5 bg-white/[0.02] backdrop-blur-sm">
@@ -26,6 +57,9 @@ export const Messages = () => {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
+          {chats?.length === 0 && (
+             <div className="p-8 text-center text-zinc-500 text-sm">No conversations yet</div>
+          )}
           {chats?.map((chat) => (
             <div 
               key={chat.id}
@@ -45,11 +79,6 @@ export const Messages = () => {
                   {chat.lastMessage}
                 </p>
               </div>
-              {chat.unreadCount > 0 && (
-                <div className="flex items-center">
-                  <span className="w-5 h-5 bg-violet-600 rounded-full flex items-center justify-center text-[10px] text-white">{chat.unreadCount}</span>
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -75,32 +104,46 @@ export const Messages = () => {
               </div>
             </div>
 
-            <div className="flex-1 p-6 overflow-y-auto space-y-6">
-              <div className="flex justify-center">
-                <span className="bg-white/5 text-zinc-500 text-xs px-3 py-1 rounded-full">Today</span>
-              </div>
-              {/* Mock Messages */}
-              <div className="flex gap-3">
-                 <img src={selectedChat.partner.avatarUrl} className="w-8 h-8 rounded-full self-end mb-1" />
-                 <div className="bg-white/10 text-zinc-200 p-3 rounded-2xl rounded-bl-none max-w-[70%]">
-                    Hey! Are you going to the CS mixer tonight? 🚀
-                 </div>
-              </div>
-              <div className="flex gap-3 flex-row-reverse">
-                 <div className="bg-violet-600 text-white p-3 rounded-2xl rounded-br-none max-w-[70%] shadow-lg shadow-violet-900/20">
-                    Yeah, I'll be there around 7!
-                 </div>
-              </div>
+            <div className="flex-1 p-6 overflow-y-auto space-y-4">
+              {messages?.map((msg: any) => (
+                <div key={msg.id} className={`flex gap-3 ${msg.senderId === currentUserId ? 'flex-row-reverse' : 'flex-row'}`}>
+                  {msg.senderId !== currentUserId && (
+                    <img src={selectedChat.partner.avatarUrl} className="w-8 h-8 rounded-full self-end mb-1" />
+                  )}
+                  <div className={`max-w-[70%] p-3 rounded-2xl ${
+                    msg.senderId === currentUserId 
+                      ? 'bg-violet-600 text-white rounded-br-none shadow-lg shadow-violet-900/20' 
+                      : 'bg-white/10 text-zinc-200 rounded-bl-none'
+                  }`}>
+                    <p className="text-sm">{msg.content}</p>
+                    <span className="text-[10px] opacity-50 block mt-1 text-right">{msg.timestamp}</span>
+                  </div>
+                </div>
+              ))}
+              {messages?.length === 0 && (
+                <div className="h-full flex items-center justify-center text-zinc-500 italic text-sm">
+                  Start the conversation!
+                </div>
+              )}
             </div>
 
             <div className="p-4 border-t border-white/5 bg-white/[0.02]">
               <div className="flex items-center gap-4 bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2">
                 <input 
                   type="text" 
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  onKeyDown={handleKeyPress}
                   placeholder="Type a message..."
                   className="flex-1 bg-transparent border-none focus:ring-0 text-zinc-200 placeholder:text-zinc-600"
                 />
-                <button className="text-zinc-500 hover:text-violet-400 transition-colors"><Send size={20} /></button>
+                <button 
+                  onClick={handleSend}
+                  disabled={sendMessageMutation.isPending || !messageText.trim()}
+                  className="text-zinc-500 hover:text-violet-400 transition-colors disabled:opacity-30"
+                >
+                  <Send size={20} />
+                </button>
               </div>
             </div>
           </>
