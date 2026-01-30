@@ -3,6 +3,8 @@ import { Heart, MessageCircle, Share2, MoreHorizontal } from 'lucide-react';
 import { Post } from '../../types';
 import { GlassCard } from '../ui/GlassCard';
 import { motion } from 'framer-motion';
+import { api } from '../../services/api';
+import { Link } from 'react-router-dom';
 
 interface PostCardProps {
   post: Post;
@@ -12,9 +14,14 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [liked, setLiked] = React.useState(post.isLiked);
   const [likesCount, setLikesCount] = React.useState(post.likes);
 
-  const handleLike = () => {
-    setLiked(!liked);
-    setLikesCount(prev => liked ? prev - 1 : prev + 1);
+  const handleLike = async () => {
+    try {
+      const response = await api.posts.like(post.id);
+      setLiked(!liked);
+      setLikesCount(response.likes_count);
+    } catch (error) {
+      console.error("Failed to like post:", error);
+    }
   };
 
   return (
@@ -34,7 +41,9 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
             />
             <div>
               <h4 className="font-semibold text-zinc-100 text-sm hover:text-violet-400 cursor-pointer transition-colors">
-                {post.author.fullName}
+                <Link to={`/profile/${post.author.username}`}>
+                  {post.author.fullName}
+                </Link>
               </h4>
               <p className="text-xs text-zinc-500">
                 @{post.author.username} • {post.timestamp}
@@ -51,12 +60,20 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
         </p>
 
         {post.imageUrl && (
-          <div className="mb-4 rounded-xl overflow-hidden border border-white/5">
-            <img 
-              src={post.imageUrl} 
-              alt="Post attachment" 
-              className="w-full h-auto object-cover max-h-[500px]"
-            />
+          <div className="mb-4 rounded-xl overflow-hidden border border-white/5 bg-zinc-900/50">
+            {['mp4', 'webm', 'ogg'].some(ext => post.imageUrl?.toLowerCase().endsWith(ext)) ? (
+              <video 
+                src={post.imageUrl} 
+                controls 
+                className="w-full h-auto max-h-[500px] object-cover"
+              />
+            ) : (
+              <img 
+                src={post.imageUrl} 
+                alt="Post attachment" 
+                className="w-full h-auto object-cover max-h-[500px]"
+              />
+            )}
           </div>
         )}
 
