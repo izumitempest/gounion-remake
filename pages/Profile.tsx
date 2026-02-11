@@ -5,9 +5,12 @@ import { api } from '../services/api';
 import { GlassCard } from '../components/ui/GlassCard';
 import { Skeleton } from '../components/ui/Skeleton';
 import { MapPin, Calendar, Link as LinkIcon, Users } from 'lucide-react';
+import { useAuthStore } from '../store';
 
 export const Profile = () => {
   const { username } = useParams<{ username: string }>();
+  const { user: currentUser } = useAuthStore();
+  const isOwnProfile = currentUser?.username === username;
   
   const { data: user, isLoading, isError } = useQuery({
     queryKey: ['profile', username],
@@ -87,13 +90,21 @@ export const Profile = () => {
           </div>
         </div>
         <div className="absolute bottom-4 right-8 flex gap-3">
-            <button className="bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors">Message</button>
-            <button 
-              onClick={handleFollow}
-              className={`${isFollowing ? 'bg-zinc-800' : 'bg-violet-600 hover:bg-violet-500'} text-white px-6 py-2 rounded-xl transition-colors shadow-lg shadow-violet-900/30 font-medium`}
-            >
-              {isFollowing ? 'Following' : 'Follow'}
-            </button>
+            {isOwnProfile ? (
+              <button className="bg-white/5 border border-white/10 text-white px-6 py-2 rounded-xl hover:bg-white/10 transition-colors font-medium">
+                Edit Profile
+              </button>
+            ) : (
+              <>
+                <button className="bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors">Message</button>
+                <button 
+                  onClick={handleFollow}
+                  className={`${isFollowing ? 'bg-zinc-800' : 'bg-violet-600 hover:bg-violet-500'} text-white px-6 py-2 rounded-xl transition-colors shadow-lg shadow-violet-900/30 font-medium`}
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+              </>
+            )}
         </div>
       </div>
 

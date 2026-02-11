@@ -14,7 +14,14 @@ import { Alumni } from './pages/Alumni';
 import { GroupDetails } from './pages/GroupDetails';
 import { useAuthStore } from './store';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60, // 1 minute
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Layout Component to wrap authenticated routes
 const AppLayout = ({ children }: { children?: React.ReactNode }) => {

@@ -19,47 +19,47 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const likeMutation = useMutation({
     mutationFn: () => api.posts.like(post.id),
     onMutate: async () => {
-      // Snapshot previous value
       await queryClient.cancelQueries({ queryKey: ['feed'] });
       const previousFeed = queryClient.getQueryData(['feed']);
 
-      // Optimistically update
-      // (This is tricky with infinite query, so we'll do simple local state for now
-      // but the 5s delay is usually because of awaiting the response)
+      // Optimistically update the feed cache
+      queryClient.setQueryData(['feed'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => 
+            page.map((p: Post) => {
+              if (p.id === post.id) {
+                return {
+                  ...p,
+                  likes: p.isLiked ? p.likes - 1 : p.likes + 1,
+                  isLiked: !p.isLiked
+                };
+              }
+              return p;
+            })
+          )
+        };
+      });
+
+      return { previousFeed };
     },
-    onSuccess: (data) => {
-      // Invalidate or update local state
+    onError: (err, newTodo, context) => {
+      queryClient.setQueryData(['feed'], context?.previousFeed);
+    },
+    onSettled: () => {
+       // Optional: invalidate to sync with server, or trust the response
+       // queryClient.invalidateQueries({ queryKey: ['feed'] });
     }
   });
 
-  // Since PostCard is used in lists, simple local state is often better for immediate feedback
-  const [liked, setLiked] = React.useState(post.isLiked);
-  const [likesCount, setLikesCount] = React.useState(post.likes);
+  // Local state for immediate checking (controlled by parent/cache now ideally, but we keep it for transition)
+  // Actually, let's derive from props and trust the parent re-render from cache update
+  const liked = post.isLiked;
+  const likesCount = post.likes;
 
-  // Sync state when props change (e.g. on feed refetch)
-  React.useEffect(() => {
-    setLiked(post.isLiked);
-    setLikesCount(post.likes);
-  }, [post.isLiked, post.likes]);
-
-  const handleLike = async () => {
-    // Immediate feedback
-    const originalLiked = liked;
-    const originalCount = likesCount;
-    
-    setLiked(!liked);
-    setLikesCount(prev => liked ? prev - 1 : prev + 1);
-
-    try {
-      const response = await api.posts.like(post.id);
-      // Synchronize with server just in case
-      setLikesCount(response.likes_count);
-    } catch (error) {
-      // Revert on error
-      setLiked(originalLiked);
-      setLikesCount(originalCount);
-      console.error("Failed to like post:", error);
-    }
+  const handleLike = () => {
+    likeMutation.mutate();
   };
 
   return (

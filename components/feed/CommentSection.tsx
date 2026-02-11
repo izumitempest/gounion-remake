@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { Skeleton } from '../ui/Skeleton';
 import { Send } from 'lucide-react';
+import { useAuthStore } from '../../store';
 
 interface CommentSectionProps {
   postId: string;
@@ -11,6 +12,7 @@ interface CommentSectionProps {
 export const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
   const [content, setContent] = useState('');
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
 
   const { data: comments, isLoading } = useQuery({
     queryKey: ['comments', postId],
@@ -19,10 +21,37 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
 
   const createCommentMutation = useMutation({
     mutationFn: (text: string) => api.posts.createComment(postId, text),
-    onSuccess: () => {
-      setContent('');
-      queryClient.invalidateQueries({ queryKey: ['comments', postId] });
-    }
+    onMutate: async (newCommentText) => {
+        await queryClient.cancelQueries({ queryKey: ['comments', postId] });
+        const previousComments = queryClient.getQueryData(['comments', postId]);
+  
+        // Optimistically add new comment
+        queryClient.setQueryData(['comments', postId], (old: any[]) => {
+          
+          const optimisticComment = {
+              id: Date.now(),
+              content: newCommentText,
+              created_at: new Date().toISOString(),
+              user: {
+                  username: user?.username || 'You',
+                  profile: {
+                      profile_picture: user?.avatarUrl
+                  }
+              }
+          };
+          
+          return old ? [...old, optimisticComment] : [optimisticComment];
+        });
+  
+        return { previousComments };
+      },
+      onError: (err, newComment, context: any) => {
+          queryClient.setQueryData(['comments', postId], context?.previousComments);
+      },
+      onSuccess: () => {
+        setContent('');
+        queryClient.invalidateQueries({ queryKey: ['comments', postId] });
+      }
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -33,35 +62,38 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
 
   return (
     <div className="mt-4 pt-4 border-t border-white/5 space-y-4">
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form onSubmit={handleSubmit} className="flex gap-3">
         <input 
           type="text" 
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Write a comment..."
-          className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-500/50 transition-all"
+          className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-500/50 transition-all placeholder:text-zinc-500"
         />
         <button 
           type="submit"
           disabled={!content.trim() || createCommentMutation.isPending}
-          className="p-2 bg-violet-600 text-white rounded-xl hover:bg-violet-500 disabled:opacity-50 transition-all"
+          className="p-2 bg-violet-600 text-white rounded-xl hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/20"
         >
           <Send size={18} />
         </button>
       </form>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {isLoading ? (
-          <Skeleton className="h-10 w-full rounded-xl" />
+          <div className="space-y-3">
+            <Skeleton className="h-10 w-full rounded-xl" />
+            <Skeleton className="h-10 w-full rounded-xl" />
+          </div>
         ) : (
           comments?.map((comment: any) => (
-            <div key={comment.id} className="flex gap-3">
+            <div key={comment.id} className="flex gap-3 group">
               <img 
                 src={comment.user.profile?.profile_picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user.username}`} 
                 alt={comment.user.username} 
-                className="w-8 h-8 rounded-full object-cover border border-white/5"
+                className="w-8 h-8 rounded-full object-cover border border-white/5 flex-shrink-0"
               />
-              <div className="flex-1 bg-white/5 rounded-2xl p-3">
+              <div className="flex-1 bg-white/5 rounded-2xl rounded-tl-sm p-3 hover:bg-white/10 transition-colors">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-xs font-bold text-zinc-100 italic">@{comment.user.username}</span>
                   <span className="text-[10px] text-zinc-500">{new Date(comment.created_at).toLocaleDateString()}</span>

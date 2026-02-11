@@ -1,6 +1,7 @@
+/// <reference types="vite/client" />
 import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:8001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
 
 // Create axios instance
 const apiClient = axios.create({
@@ -39,7 +40,9 @@ const transformUser = (user: any) => {
 
 // Helper to transform post data
 const transformPost = (post: any) => {
-  const currentUserId = localStorage.getItem('user_id');
+  const userStr = localStorage.getItem('user_data');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const currentUserId = user ? user.id : null;
   const getFullUrl = (url: string | null) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
@@ -54,7 +57,7 @@ const transformPost = (post: any) => {
     likes: post.likes_count || 0,
     comments: post.comments?.length || 0,
     timestamp: new Date(post.created_at).toLocaleDateString(),
-    isLiked: post.likes?.some((l: any) => l.user_id === currentUserId) || false,
+    isLiked: post.likes?.some((l: any) => l.id === currentUserId) || false,
   };
 };
 
@@ -66,12 +69,14 @@ export const api = {
       formData.append('password', credentials.password);
       
       const res = await apiClient.post('/token', formData);
-      localStorage.setItem('access_token', res.data.access_token);
+      const accessToken = res.data.access_token;
+      localStorage.setItem('access_token', accessToken);
       
       const userRes = await apiClient.get('/users/me/');
-      localStorage.setItem('user_id', userRes.data.id);
       const transformedUser = transformUser(userRes.data);
-      return { user: transformedUser, access_token: res.data.access_token };
+      localStorage.setItem('user_data', JSON.stringify(transformedUser));
+      
+      return { user: transformedUser, access_token: accessToken };
     },
     signup: async (data: any) => {
       const res = await apiClient.post('/users/', {

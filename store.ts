@@ -9,19 +9,33 @@ interface AuthState {
   logout: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null, // Start as null to force login screen demo
-  token: null,
-  isAuthenticated: false,
-  login: (user, token) => {
-    localStorage.setItem('token', token);
-    set({ user, token, isAuthenticated: true });
-  },
-  logout: () => {
-    localStorage.removeItem('token');
-    set({ user: null, token: null, isAuthenticated: false });
-  },
-}));
+export const useAuthStore = create<AuthState>((set) => {
+  // Initialize from localStorage
+  const token = localStorage.getItem('access_token');
+  const userStr = localStorage.getItem('user_data');
+  let user = null;
+  try {
+    user = userStr ? JSON.parse(userStr) : null;
+  } catch (e) {
+    console.error("Failed to parse user data", e);
+  }
+
+  return {
+    user: user,
+    token: token,
+    isAuthenticated: !!token,
+    login: (user, token) => {
+      localStorage.setItem('access_token', token);
+      localStorage.setItem('user_data', JSON.stringify(user));
+      set({ user, token, isAuthenticated: true });
+    },
+    logout: () => {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user_data');
+      set({ user: null, token: null, isAuthenticated: false });
+    },
+  };
+});
 
 interface UIState {
   sidebarOpen: boolean;
