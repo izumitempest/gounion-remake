@@ -8,6 +8,7 @@ export interface User {
   following: number;
   bio?: string;
   coverUrl?: string;
+  isFollowing?: boolean;
 }
 
 export interface Post {

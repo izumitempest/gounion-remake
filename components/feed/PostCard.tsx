@@ -1,12 +1,18 @@
-import React from 'react';
-import { Heart, MessageCircle, Share2, MoreHorizontal } from 'lucide-react';
-import { Post } from '../../types';
-import { GlassCard } from '../ui/GlassCard';
-import { motion } from 'framer-motion';
-import { api } from '../../services/api';
-import { Link } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { CommentSection } from './CommentSection';
+import React from "react";
+import {
+  Heart,
+  MessageCircle,
+  Share2,
+  MoreHorizontal,
+  Bookmark,
+} from "lucide-react";
+import { Post } from "../../types";
+import { motion, AnimatePresence } from "framer-motion";
+import { api } from "../../services/api";
+import { Link } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { CommentSection } from "./CommentSection";
+import { useAuthStore } from "../../store";
 
 interface PostCardProps {
   post: Post;
@@ -15,130 +21,153 @@ interface PostCardProps {
 export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [showComments, setShowComments] = React.useState(false);
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuthStore();
 
   const likeMutation = useMutation({
     mutationFn: () => api.posts.like(post.id),
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['feed'] });
-      const previousFeed = queryClient.getQueryData(['feed']);
+      await queryClient.cancelQueries({ queryKey: ["feed"] });
+      const previousFeed = queryClient.getQueryData(["feed"]);
 
-      // Optimistically update the feed cache
-      queryClient.setQueryData(['feed'], (old: any) => {
+      queryClient.setQueryData(["feed"], (old: any) => {
         if (!old) return old;
         return {
           ...old,
-          pages: old.pages.map((page: any) => 
+          pages: old.pages.map((page: any) =>
             page.map((p: Post) => {
               if (p.id === post.id) {
                 return {
                   ...p,
                   likes: p.isLiked ? p.likes - 1 : p.likes + 1,
-                  isLiked: !p.isLiked
+                  isLiked: !p.isLiked,
                 };
               }
               return p;
-            })
-          )
+            }),
+          ),
         };
       });
 
       return { previousFeed };
     },
     onError: (err, newTodo, context) => {
-      queryClient.setQueryData(['feed'], context?.previousFeed);
+      queryClient.setQueryData(["feed"], context?.previousFeed);
     },
-    onSettled: () => {
-       // Optional: invalidate to sync with server, or trust the response
-       // queryClient.invalidateQueries({ queryKey: ['feed'] });
-    }
   });
 
-  // Local state for immediate checking (controlled by parent/cache now ideally, but we keep it for transition)
-  // Actually, let's derive from props and trust the parent re-render from cache update
-  const liked = post.isLiked;
-  const likesCount = post.likes;
-
-  const handleLike = () => {
-    likeMutation.mutate();
-  };
-
   return (
-    <motion.div
+    <motion.article
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="mb-4"
+      className="glass-card rounded-[32px] overflow-hidden mb-6 group transition-all duration-500 hover:shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-white/5 hover:border-white/10"
     >
-      <GlassCard hoverEffect>
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <img 
-              src={post.author.avatarUrl} 
-              alt={post.author.username} 
-              className="w-10 h-10 rounded-full object-cover border border-white/10"
-            />
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <Link
+            to={`/profile/${post.author.username}`}
+            className="flex items-center gap-3"
+          >
+            <div className="w-12 h-12 rounded-full story-ring p-[2px] transition-transform duration-500 group-hover:scale-105">
+              <div className="w-full h-full rounded-full border-2 border-[#0a0a0c] overflow-hidden">
+                <img
+                  src={
+                    post.author.avatarUrl ||
+                    `https://ui-avatars.com/api/?name=${post.author.fullName}&background=random`
+                  }
+                  className="w-full h-full object-cover"
+                  alt={post.author.fullName}
+                />
+              </div>
+            </div>
             <div>
-              <h4 className="font-semibold text-zinc-100 text-sm hover:text-violet-400 cursor-pointer transition-colors">
-                <Link to={`/profile/${post.author.username}`}>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-sm font-black text-white hover:text-primary transition-colors">
                   {post.author.fullName}
-                </Link>
-              </h4>
-              <p className="text-xs text-zinc-500">
-                @{post.author.username} • {post.timestamp}
+                </h3>
+                <span className="w-3 h-3 bg-accent rounded-full flex items-center justify-center text-[6px] font-black text-white">
+                  ✓
+                </span>
+              </div>
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                {post.author.university} • {post.timestamp}
               </p>
             </div>
-          </div>
-          <button className="text-zinc-500 hover:text-zinc-300">
+          </Link>
+          <button className="p-2 text-zinc-600 hover:text-white transition-colors">
             <MoreHorizontal size={20} />
           </button>
         </div>
 
-        <p className="text-zinc-300 text-sm leading-relaxed mb-4 whitespace-pre-wrap">
+        {/* Content */}
+        <div className="text-zinc-200 text-[15px] leading-relaxed mb-4 font-medium">
           {post.content}
-        </p>
+        </div>
 
+        {/* Media */}
         {post.imageUrl && (
-          <div className="mb-4 rounded-xl overflow-hidden border border-white/5 bg-zinc-900/50">
-            {['mp4', 'webm', 'ogg'].some(ext => post.imageUrl?.toLowerCase().endsWith(ext)) ? (
-              <video 
-                src={post.imageUrl} 
-                controls 
-                className="w-full h-auto max-h-[500px] object-cover"
-              />
-            ) : (
-              <img 
-                src={post.imageUrl} 
-                alt="Post attachment" 
-                className="w-full h-auto object-cover max-h-[500px]"
-              />
-            )}
+          <div className="mb-6 rounded-[24px] overflow-hidden border border-white/5 bg-zinc-900/50 relative group/media">
+            <img
+              src={post.imageUrl}
+              className="w-full object-cover max-h-[500px] transition-transform duration-700 group-hover/media:scale-105"
+              alt="Post media"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
           </div>
         )}
 
-        <div className="flex items-center gap-6 pt-4 border-t border-white/5">
-          <button 
-            onClick={handleLike}
-            className={`flex items-center gap-2 text-sm transition-colors group ${liked ? 'text-pink-500' : 'text-zinc-400 hover:text-pink-400'}`}
-          >
-            <Heart size={18} className={`transition-transform group-active:scale-125 ${liked ? 'fill-current' : ''}`} />
-            <span>{likesCount}</span>
-          </button>
-          
-          <button 
-            onClick={() => setShowComments(!showComments)}
-            className={`flex items-center gap-2 text-sm transition-colors group ${showComments ? 'text-violet-400' : 'text-zinc-400 hover:text-violet-400'}`}
-          >
-            <MessageCircle size={18} className="group-active:scale-90 transition-transform" />
-            <span>{post.comments}</span>
-          </button>
-
-          <button className="flex items-center gap-2 text-sm text-zinc-400 hover:text-emerald-400 transition-colors ml-auto">
-            <Share2 size={18} />
+        {/* Interactions */}
+        <div className="flex items-center justify-between pt-4 border-t border-white/5">
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => likeMutation.mutate()}
+              className={`flex items-center gap-2 transition-all duration-300 group/btn ${post.isLiked ? "text-primary" : "text-zinc-500 hover:text-primary"}`}
+            >
+              <div
+                className={`p-2 rounded-xl transition-colors ${post.isLiked ? "bg-primary/10" : "group-hover:bg-primary/5"}`}
+              >
+                <Heart
+                  size={20}
+                  className={post.isLiked ? "fill-current" : ""}
+                />
+              </div>
+              <span className="text-xs font-black">{post.likes}</span>
+            </button>
+            <button
+              onClick={() => setShowComments(!showComments)}
+              className={`flex items-center gap-2 transition-all duration-300 group/btn ${showComments ? "text-accent" : "text-zinc-500 hover:text-accent"}`}
+            >
+              <div
+                className={`p-2 rounded-xl transition-colors ${showComments ? "bg-accent/10" : "group-hover:bg-accent/5"}`}
+              >
+                <MessageCircle size={20} />
+              </div>
+              <span className="text-xs font-black">{post.comments}</span>
+            </button>
+            <button className="flex items-center gap-2 text-zinc-500 hover:text-white transition-all duration-300 group/btn">
+              <div className="p-2 rounded-xl group-hover:bg-white/5">
+                <Share2 size={20} />
+              </div>
+            </button>
+          </div>
+          <button className="p-2 text-zinc-500 hover:text-white transition-colors">
+            <Bookmark size={20} />
           </button>
         </div>
 
-        {showComments && <CommentSection postId={post.id} />}
-      </GlassCard>
-    </motion.div>
+        <AnimatePresence>
+          {showComments && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.4, ease: "circOut" }}
+            >
+              <CommentSection postId={post.id} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.article>
   );
 };

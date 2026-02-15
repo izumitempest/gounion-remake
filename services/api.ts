@@ -10,44 +10,44 @@ const apiClient = axios.create({
 
 // Add interceptor to include token
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
+  const token = sessionStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Helper to transform user data
-const transformUser = (user: any) => {
-  const getFullUrl = (url: string | null) => {
-    if (!url) return null;
-    if (url.startsWith('http')) return url;
-    return `${API_URL}${url}`;
-  };
+// Helper to build full URLs for media
+const getFullUrl = (url: string | null) => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('blob:')) return url;
+  const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+  return `${API_URL}${cleanUrl}`;
+};
 
+// Helper to transform user data
+export const transformUser = (user: any) => {
   return {
     id: user.id,
     username: user.username,
-    fullName: user.username, // Using username as fullName if not provided
+    fullName: user.profile?.full_name || user.username,
     avatarUrl: getFullUrl(user.profile?.profile_picture) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`,
     university: user.profile?.university || 'University Student',
     followers: 0,
     following: 0,
     bio: user.profile?.bio || '',
     coverUrl: getFullUrl(user.profile?.cover_photo) || '',
+    isFollowing: false,
   };
 };
 
 // Helper to transform post data
+// Helper to transform post data
 const transformPost = (post: any) => {
-  const userStr = localStorage.getItem('user_data');
+  const userStr = sessionStorage.getItem('user_data');
   const user = userStr ? JSON.parse(userStr) : null;
   const currentUserId = user ? user.id : null;
-  const getFullUrl = (url: string | null) => {
-    if (!url) return null;
-    if (url.startsWith('http')) return url;
-    return `${API_URL}${url}`;
-  };
 
   return {
     id: post.id.toString(),
@@ -70,11 +70,12 @@ export const api = {
       
       const res = await apiClient.post('/token', formData);
       const accessToken = res.data.access_token;
-      localStorage.setItem('access_token', accessToken);
+      sessionStorage.setItem('access_token', accessToken);
       
       const userRes = await apiClient.get('/users/me/');
       const transformedUser = transformUser(userRes.data);
-      localStorage.setItem('user_data', JSON.stringify(transformedUser));
+      sessionStorage.setItem('user_data', JSON.stringify(transformedUser));
+      sessionStorage.setItem('user_id', transformedUser.id);
       
       return { user: transformedUser, access_token: accessToken };
     },
@@ -129,22 +130,17 @@ export const api = {
   profiles: {
     get: async (username: string) => {
       const res = await apiClient.get(`/profiles/${username}`);
-      // The backend returns a Profile object, which is slightly different
-      // but transformUser expects a User object with a profile nested.
-      // We need to fetch the user too if we want a full User object.
-      // For now, let's assume we want to transform the profile into our User type.
-      // Actually, let's check what /profiles/{username} returns.
-      // Backend: return user.profile
       return {
         id: res.data.user_id,
         username: username,
-        fullName: username, // Should probably come from user
-        avatarUrl: res.data.profile_picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+        fullName: username, 
+        avatarUrl: getFullUrl(res.data.profile_picture) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
         university: res.data.university || 'University Student',
         followers: 0,
         following: 0,
         bio: res.data.bio || '',
-        coverUrl: res.data.cover_photo || '',
+        coverUrl: getFullUrl(res.data.cover_photo) || '',
+        isFollowing: false,
       };
     },
     getPosts: async (username: string) => {
@@ -157,6 +153,29 @@ export const api = {
         .filter((p: any) => p.user.username === username)
         .map(transformPost);
     },
+    update: async (data: any) => {
+      let profile_picture = data.profile_picture;
+      
+      if (data.avatar) {
+        const formData = new FormData();
+        formData.append('file', data.avatar);
+        const uploadRes = await apiClient.post('/upload/', formData);
+        profile_picture = uploadRes.data.url;
+      }
+
+      const res = await apiClient.put('/profiles/me', {
+        full_name: data.fullName,
+        bio: data.bio,
+        university: data.university,
+        profile_picture: profile_picture
+      });
+      
+      // Profiles/me returns the profile object, but we need the user object for transformUser
+      // Let's refetch me or just handle it. 
+      // Actually, transformUser expects user structure. 
+      const userRes = await apiClient.get('/users/me/');
+      return transformUser(userRes.data);
+    },
     follow: async (userId: string) => {
       const res = await apiClient.post(`/users/${userId}/follow`);
       return res.data;
@@ -164,6 +183,12 @@ export const api = {
     unfollow: async (userId: string) => {
       const res = await apiClient.post(`/users/${userId}/unfollow`);
       return res.data;
+    },
+    getSuggestions: async () => {
+      // For now, we search for a common letter or just 'a' to get some users
+      // Ideally, the backend would have a /users/suggestions endpoint
+      const res = await apiClient.get('/search/users?q=');
+      return res.data.map(transformUser).filter((u: any) => u.id !== sessionStorage.getItem('user_id'));
     }
   },
   groups: {
@@ -220,9 +245,10 @@ export const api = {
   chats: {
     getAll: async () => {
       const res = await apiClient.get('/conversations/');
+      const currentUserId = sessionStorage.getItem('user_id');
       return res.data.map((c: any) => ({
         id: c.id.toString(),
-        partner: transformUser(c.participants.find((p: any) => p.id !== localStorage.getItem('user_id')) || c.participants[0]),
+        partner: transformUser(c.participants.find((p: any) => p.id !== currentUserId) || c.participants[0]),
         lastMessage: c.messages?.[c.messages.length - 1]?.content || 'No messages yet',
         timestamp: c.messages?.[c.messages.length - 1] ? new Date(c.messages[c.messages.length - 1].created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
         unreadCount: 0,
@@ -258,6 +284,42 @@ export const api = {
         timestamp: new Date(n.created_at).toLocaleDateString(),
         read: n.is_read
       }));
+    }
+  },
+  stories: {
+    getFeed: async () => {
+      const res = await apiClient.get('/stories/feed');
+      return res.data.map((s: any) => ({
+        id: s.id.toString(),
+        user: transformUser(s.user),
+        content: s.content,
+        imageUrl: getFullUrl(s.image_url),
+        timestamp: new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        likesCount: s.likes?.length || 0,
+        viewsCount: s.views?.length || 0,
+        isLiked: s.likes?.some((l: any) => l.user_id === sessionStorage.getItem('user_id')),
+      }));
+    },
+    create: async (data: any) => {
+      let imageUrl = null;
+      if (data.image) {
+        const formData = new FormData();
+        formData.append('file', data.image);
+        const uploadRes = await apiClient.post('/upload/', formData);
+        imageUrl = uploadRes.data.url;
+      }
+      const res = await apiClient.post('/stories/', {
+        content: data.content,
+        image_url: imageUrl
+      });
+      return res.data;
+    },
+    view: async (id: string) => {
+      await apiClient.post(`/stories/${id}/view`);
+    },
+    like: async (id: string) => {
+      const res = await apiClient.post(`/stories/${id}/like`);
+      return res.data;
     }
   }
 };
