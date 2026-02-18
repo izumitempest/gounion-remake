@@ -58,6 +58,7 @@ const transformPost = (post: any) => {
     comments: post.comments?.length || 0,
     timestamp: new Date(post.created_at).toLocaleDateString(),
     isLiked: post.likes?.some((l: any) => l.id === currentUserId) || false,
+    groupId: post.group_id?.toString(),
   };
 };
 
@@ -198,18 +199,61 @@ export const api = {
         id: g.id.toString(),
         name: g.name,
         description: g.description,
-        memberCount: 0,
-        imageUrl: g.cover_image || `https://api.dicebear.com/7.x/identicon/svg?seed=${g.name}`,
-        isJoined: false
+        memberCount: 0, // Backend could provide this or we calculate
+        imageUrl: getFullUrl(g.cover_image) || `https://api.dicebear.com/7.x/identicon/svg?seed=${g.name}`,
+        isJoined: false,
+        privacy: g.privacy
       }));
+    },
+    getById: async (id: string) => {
+      const res = await apiClient.get(`/groups/${id}`);
+      const g = res.data;
+      return {
+        id: g.id.toString(),
+        name: g.name,
+        description: g.description,
+        memberCount: 0,
+        imageUrl: getFullUrl(g.cover_image) || `https://api.dicebear.com/7.x/identicon/svg?seed=${g.name}`,
+        isJoined: false,
+        privacy: g.privacy,
+        creatorId: g.creator_id
+      };
+    },
+    getMembers: async (id: string) => {
+      const res = await apiClient.get(`/groups/${id}/members/`);
+      return res.data;
     },
     join: async (id: string) => {
       const res = await apiClient.post(`/groups/${id}/join`);
-      return { success: true };
+      return res.data; // { status: 'joined' | 'pending', message: string }
+    },
+    getRequests: async (id: string) => {
+      const res = await apiClient.get(`/groups/${id}/requests/`);
+      return res.data;
+    },
+    approveRequest: async (requestId: number, status: 'accepted' | 'rejected') => {
+      const res = await apiClient.post(`/groups/requests/${requestId}/approve?status=${status}`);
+      return res.data;
+    },
+    create: async (data: any) => {
+      let cover_image = null;
+      if (data.image) {
+        const formData = new FormData();
+        formData.append('file', data.image);
+        const uploadRes = await apiClient.post('/upload/', formData);
+        cover_image = uploadRes.data.url;
+      }
+      const res = await apiClient.post('/groups/', {
+        name: data.name,
+        description: data.description,
+        privacy: data.privacy,
+        cover_image: cover_image
+      });
+      return res.data;
     },
     getPosts: async (id: string) => {
       const res = await apiClient.get(`/groups/${id}/posts/`);
-      return res.data;
+      return res.data.map(transformPost);
     },
     createPost: async (id: string, data: any) => {
       let imageUrl = null;
@@ -223,7 +267,7 @@ export const api = {
         caption: data.caption,
         image: imageUrl
       });
-      return res.data;
+      return transformPost(res.data);
     }
   },
   search: {

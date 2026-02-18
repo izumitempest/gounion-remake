@@ -26,8 +26,12 @@ export const Sidebar = ({ className }: { className?: string }) => {
       className={`${className} flex flex-col h-full border-r border-white/5 bg-[#0a0a0c]/50 backdrop-blur-xl pt-8 pb-8 px-5`}
     >
       <div className="flex items-center gap-3 mb-10 px-2 group cursor-pointer">
-        <div className="w-10 h-10 bg-primary rounded-2xl flex items-center justify-center text-black font-black text-xl shadow-[0_0_20px_rgba(196,255,14,0.3)] transition-transform group-hover:scale-110">
-          U
+        <div className="w-10 h-10 bg-white/5 rounded-2xl flex items-center justify-center overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.05)] transition-transform group-hover:scale-110 border border-white/10">
+          <img
+            src="/logo.png"
+            alt="University Logo"
+            className="w-8 h-8 object-contain"
+          />
         </div>
         <span className="text-2xl font-black tracking-tighter text-white">
           GoUnion

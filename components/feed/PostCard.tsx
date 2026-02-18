@@ -26,32 +26,61 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const likeMutation = useMutation({
     mutationFn: () => api.posts.like(post.id),
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ["feed"] });
-      const previousFeed = queryClient.getQueryData(["feed"]);
+      const feedKey = ["feed"];
+      const groupKey = post.groupId ? ["group-posts", post.groupId] : null;
 
-      queryClient.setQueryData(["feed"], (old: any) => {
+      await queryClient.cancelQueries({ queryKey: feedKey });
+      if (groupKey) await queryClient.cancelQueries({ queryKey: groupKey });
+
+      const previousFeed = queryClient.getQueryData(feedKey);
+      const previousGroupPosts = groupKey
+        ? queryClient.getQueryData(groupKey)
+        : null;
+
+      const updatePost = (p: Post) => {
+        if (p.id === post.id) {
+          return {
+            ...p,
+            likes: p.isLiked ? p.likes - 1 : p.likes + 1,
+            isLiked: !p.isLiked,
+          };
+        }
+        return p;
+      };
+
+      queryClient.setQueryData(feedKey, (old: any) => {
         if (!old) return old;
         return {
           ...old,
-          pages: old.pages.map((page: any) =>
-            page.map((p: Post) => {
-              if (p.id === post.id) {
-                return {
-                  ...p,
-                  likes: p.isLiked ? p.likes - 1 : p.likes + 1,
-                  isLiked: !p.isLiked,
-                };
-              }
-              return p;
-            }),
-          ),
+          pages: old.pages.map((page: any) => page.map(updatePost)),
         };
       });
 
-      return { previousFeed };
+      if (groupKey) {
+        queryClient.setQueryData(groupKey, (old: any) => {
+          if (!old) return old;
+          return old.map(updatePost);
+        });
+      }
+
+      return { previousFeed, previousGroupPosts };
     },
     onError: (err, newTodo, context) => {
       queryClient.setQueryData(["feed"], context?.previousFeed);
+      if (post.groupId && context?.previousGroupPosts) {
+        queryClient.setQueryData(
+          ["group-posts", post.groupId],
+          context.previousGroupPosts,
+        );
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["feed"] });
+      if (post.groupId) {
+        queryClient.invalidateQueries({
+          queryKey: ["group-posts", post.groupId],
+        });
+      }
     },
   });
 
@@ -163,7 +192,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.4, ease: "circOut" }}
             >
-              <CommentSection postId={post.id} />
+              <CommentSection postId={post.id} groupId={post.groupId} />
             </motion.div>
           )}
         </AnimatePresence>

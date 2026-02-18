@@ -16,6 +16,7 @@ export const Dashboard = () => {
       getNextPageParam: (lastPage, allPages) => {
         return lastPage.length > 0 ? allPages.length : undefined;
       },
+      refetchInterval: 5000, // Poll every 5 seconds for "real-time" feel
     });
 
   const { data: suggestions } = useQuery({

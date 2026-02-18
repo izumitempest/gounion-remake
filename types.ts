@@ -20,6 +20,7 @@ export interface Post {
   comments: number;
   timestamp: string;
   isLiked?: boolean;
+  groupId?: string;
 }
 
 export interface Group {
